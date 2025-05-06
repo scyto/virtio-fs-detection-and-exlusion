@@ -27,15 +27,17 @@ sudo bash ./gen-vfio-ids.sh
 
 ```bash
 🔍 Detecting boot pool NVMe devices...
-🚫 Boot PCI IDs to exclude: 84:00.0 83:00.0
+🚫 Boot PCI IDs to exclude:
+  84:00.0 - 84:00.0 Non-Volatile memory controller  (rev 01)
+  83:00.0 - 83:00.0 Non-Volatile memory controller  (rev 01)
 
-⚠️ Skipping boot device at 83:00.0
-⚠️ Skipping boot device at 84:00.0
+⚠️  Skipping boot device at 83:00.0 - 83:00.0 Non-Volatile memory controller  (rev 01)
+⚠️  Skipping boot device at 84:00.0 - 84:00.0 Non-Volatile memory controller  (rev 01)
 ✅ Devices to passthrough:
-PCI ID     Vendor:Device  Device Description
-------------------------------------------------------------
-05:00.0    1cc1:8201      ADATA XPG SX8200 Pro
-06:00.0    2646:5024      Kingston DC2000B NVMe SSD
+PCI ID     Vendor:Device  Device Description                                          
+--------------------------------------------------------------------------------------------
+05:00.0    1cc1:8201      ADATA Technology Co., Ltd. XPG SX8200 Pro PCIe Gen3x4 M.2 22
+06:00.0    2646:5024      Kingston Technology Company, Inc. DC2000B NVMe SSD    
 ...
 
 🧹 Paste the following block into your initramfs vfio-pci-bind hook:
