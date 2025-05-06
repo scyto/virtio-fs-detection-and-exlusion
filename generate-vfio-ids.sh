@@ -20,7 +20,8 @@ fi
 
 echo "🚫 Boot PCI IDs to exclude:"
 for pci_id in "${BOOT_PCI_IDS[@]}"; do
-  device_info=$(lspci -s "$pci_id" -nn | sed 's/\[.*\]//')
+  # Use lspci to get the full vendor and device description
+  device_info=$(lspci -s "$pci_id" -nn | sed -E 's/^[^ ]+ +[^ ]+ +//')
   echo "  $pci_id - $device_info"
 done
 echo ""
