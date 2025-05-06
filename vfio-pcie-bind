@@ -1,0 +1,44 @@
+#!/bin/sh
+# Early vfio-pci binding via initramfs
+# Runs before any storage or network drivers claim devices
+
+PREREQ=""
+
+prereqs() {
+    echo "$PREREQ"
+}
+
+case "$1" in
+  prereqs)
+    prereqs
+    exit 0
+    ;;
+esac
+
+# === Actual logic ===
+. /scripts/functions
+echo "🔐 Early vfio-pci binding (initramfs)"
+
+BIND_PCI_IDS="
+0000:05:00.0
+0000:06:00.0
+0000:07:00.0
+0000:42:00.0
+0000:42:00.1
+0000:a1:00.0
+0000:a3:00.0
+0000:a5:00.0
+0000:a7:00.0
+0000:e1:00.0
+0000:e2:00.0
+0000:e3:00.0
+0000:e4:00.0
+0000:e6:00.0
+0000:e6:00.1
+"
+
+for id in $BIND_PCI_IDS; do
+  echo "vfio-pci" > /sys/bus/pci/devices/$id/driver_override 2>/dev/null || true
+done
+
+modprobe -i vfio-pci
