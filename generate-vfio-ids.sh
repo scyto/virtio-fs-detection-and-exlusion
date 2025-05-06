@@ -18,7 +18,11 @@ else
   echo "⚠️  zpool not found — skipping boot device detection"
 fi
 
-echo "🚫 Boot PCI IDs to exclude: ${BOOT_PCI_IDS[*]}"
+echo "🚫 Boot PCI IDs to exclude:"
+for pci_id in "${BOOT_PCI_IDS[@]}"; do
+  device_info=$(lspci -s "$pci_id" -nn | sed 's/\[.*\]//')
+  echo "  $pci_id - $device_info"
+done
 echo ""
 
 VFIO_IDS=()
@@ -31,13 +35,19 @@ while IFS= read -r line; do
 
   [[ -z "$PCI_ID" || -z "$VENDOR_DEVICE" ]] && continue
   [[ " ${BOOT_PCI_IDS[*]} " =~ " $PCI_ID " ]] && {
-    echo "⚠️  Skipping boot device at $PCI_ID"
+    device_info=$(lspci -s "$PCI_ID" -nn | sed 's/\[.*\]//')
+    echo "⚠️  Skipping boot device at $PCI_ID - $device_info"
     continue
   }
 
   VERBOSE_DESC=$(lspci -s "$PCI_ID" -v | grep -m1 "Subsystem:" | sed 's/.*Subsystem: //')
   VERBOSE_DESC=${VERBOSE_DESC:-$(echo "$line" | cut -d' ' -f2-)}
   VERBOSE_DESC=$(echo "$VERBOSE_DESC" | sed 's/\[.*\]//' | cut -c1-60)
+
+  # Add a label for AMD SATA controllers
+  if [[ "$VENDOR_DEVICE" == "1022:7901" ]]; then
+    VERBOSE_DESC="$VERBOSE_DESC (AMD SATA Controller)"
+  fi
 
   if [[ ! " ${VFIO_IDS[*]} " =~ "$VENDOR_DEVICE" ]]; then
     VFIO_IDS+=("$VENDOR_DEVICE")
