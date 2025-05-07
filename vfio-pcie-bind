@@ -1,25 +1,20 @@
 #!/bin/sh
 # Early vfio-pci binding via initramfs
-# Runs before any storage or network drivers claim devices
+# It unloads the AHCI and NVMe drivers and binds the devices to vfio-pci for those in the list
+# this won't work for non-AHCI/NVMe devices
 
 PREREQ=""
-
-prereqs() {
-    echo "$PREREQ"
-}
+prereqs() { echo "$PREREQ"; }
 
 case "$1" in
-  prereqs)
-    prereqs
-    exit 0
-    ;;
+  prereqs) prereqs; exit 0 ;;
 esac
 
-# === Actual logic ===
 . /scripts/functions
-echo "🔐 Early vfio-pci binding (initramfs)"
+echo "🔧 vfio-pci-bind starting" > /dev/kmsg
 
-BIND_PCI_IDS="
+# === Devices to pass through to vfio-pci ===
+BIND_TO_VFIO="
 0000:05:00.0
 0000:06:00.0
 0000:07:00.0
@@ -37,8 +32,22 @@ BIND_PCI_IDS="
 0000:e6:00.1
 "
 
-for id in $BIND_PCI_IDS; do
-  echo "vfio-pci" > /sys/bus/pci/devices/$id/driver_override 2>/dev/null || true
+for id in $BIND_TO_VFIO; do
+  driver_link="/sys/bus/pci/devices/$id/driver"
+  if [ -e "$driver_link" ]; then
+    # Check current driver name
+    current_drv=$(basename "$(readlink "$driver_link")" 2>/dev/null || echo "")
+    if [ "$current_drv" = "nvme" ] || [ "$current_drv" = "ahci" ]; then
+      echo "$id" > "$driver_link/unbind"
+      echo "💥 Unbound $id from $current_drv" > /dev/kmsg
+    else
+      echo "ℹ️  $id is not bound to nvme or ahci (found: $current_drv)" > /dev/kmsg
+    fi
+  fi
+
+  echo vfio-pci > /sys/bus/pci/devices/$id/driver_override
+  echo "🎯 Set override to vfio-pci for $id" > /dev/kmsg
 done
 
 modprobe -i vfio-pci
+echo "✅ vfio-pci modprobe completed" > /dev/kmsg

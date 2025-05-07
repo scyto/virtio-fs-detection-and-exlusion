@@ -4,24 +4,40 @@ set -euo pipefail
 echo "🔍 Detecting boot pool NVMe devices..."
 
 BOOT_PCI_IDS=()
+
 if command -v zpool &>/dev/null; then
   while IFS= read -r partdev; do
-    basedev=$(basename "$partdev" | sed -E 's/p[0-9]+$//')
-    pci_path=$(readlink -f /sys/block/$basedev/device 2>/dev/null || true)
-    if [[ -n "$pci_path" ]]; then
-      pci_addr=$(basename "$(dirname "$(dirname "$pci_path")")")
-      pci_addr=${pci_addr#0000:}
-      BOOT_PCI_IDS+=("$pci_addr")
+    # Translate from disk-by-id to real device path (e.g., /dev/nvme0n1p3)
+    realdev=$(readlink -f "/dev/disk/by-id/$partdev" 2>/dev/null)
+    if [[ -z "$realdev" ]]; then
+      echo "⚠️  Skipping $partdev (no /dev/disk/by-id/ match)"
+      continue
     fi
-  done < <(sudo zpool status boot-pool 2>/dev/null | awk '/boot-pool/ {f=1; next} f && /nvme/ {print $1}')
+
+    devname=$(basename "$realdev" | sed -E 's/p[0-9]+$//')  # remove partition
+    sysdev="/sys/block/$devname"
+
+    if [[ ! -e "$sysdev/device" ]]; then
+      echo "⚠️  Skipping $devname (no sysfs device path)"
+      continue
+    fi
+
+    pci_path=$(readlink -f "$sysdev/device")
+    pci_addr=$(basename "$(dirname "$(dirname "$pci_path")")")
+    pci_addr=${pci_addr#0000:}
+    BOOT_PCI_IDS+=("$pci_addr")
+  done < <(zpool status 2>/dev/null | awk '
+    /^  pool: (boot-pool|rpool)$/ {inpool=1; next}
+    inpool && $0 ~ /nvme/ {print $1}
+    inpool && /^errors:/ {inpool=0}
+  ')
 else
   echo "⚠️  zpool not found — skipping boot device detection"
 fi
 
 echo "🚫 Boot PCI IDs to exclude:"
 for pci_id in "${BOOT_PCI_IDS[@]}"; do
-  # Use lspci to get the full vendor and device description
-  device_info=$(lspci -s "$pci_id" -nn | sed -E 's/^[^ ]+ +[^ ]+ +//')
+  device_info=$(lspci -s "$pci_id" -nn 2>/dev/null || echo "Unknown device")
   echo "  $pci_id - $device_info"
 done
 echo ""
@@ -45,7 +61,6 @@ while IFS= read -r line; do
   VERBOSE_DESC=${VERBOSE_DESC:-$(echo "$line" | cut -d' ' -f2-)}
   VERBOSE_DESC=$(echo "$VERBOSE_DESC" | sed 's/\[.*\]//' | cut -c1-60)
 
-  # Add a label for AMD SATA controllers
   if [[ "$VENDOR_DEVICE" == "1022:7901" ]]; then
     VERBOSE_DESC="$VERBOSE_DESC (AMD SATA Controller)"
   fi
