@@ -108,7 +108,9 @@ Add the following lines if not already present:
 
 ```bash
 vfio
+vfio_iommu_type1
 vfio_pci
+vfio_virqfd
 ```
 
 ---
@@ -116,7 +118,7 @@ vfio_pci
 ## 🔄 Step 4: Rebuild Initramfs
 
 ```bash
-sudo update-initramfs -u
+update-initramfs -u
 ```
 
 ---
