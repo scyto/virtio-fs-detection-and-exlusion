@@ -2,12 +2,14 @@
 
 This repo helps safely bind selected PCI storage devices (NVMe, SATA) to `vfio-pci` **early in boot**, before the kernel or systemd services can claim them — ideal for PCI passthrough to VMs or containers.
 
+**NOTE** this script is only needed if you can't use the classic device blacklisting in the proxmox wiki
+
 ---
 
 ## 🧰 Requirements
 
 * ✅ Linux with `initramfs-tools` (e.g. Debian, Ubuntu, Proxmox, TrueNAS SCALE)
-* ✅ ZFS `boot-pool` (used to auto-detect boot drives)
+* ✅ ZFS `boot-pool` or `rpool` (used to auto-detect boot drives)
 * ✅ Scripts from this repo:
 
   * `gen-vfio-ids.sh`: Detects and excludes boot drives, lists passthrough-safe devices
@@ -20,7 +22,7 @@ This repo helps safely bind selected PCI storage devices (NVMe, SATA) to `vfio-p
 Run the generator:
 
 ```bash
-sudo bash ./gen-vfio-ids.sh
+bash ./generate-vfio-ids.sh
 ```
 
 ### 📋 Sample Output
@@ -28,8 +30,8 @@ sudo bash ./gen-vfio-ids.sh
 ```bash
 🔍 Detecting boot pool NVMe devices...
 🚫 Boot PCI IDs to exclude:
-  84:00.0 - 84:00.0 Non-Volatile memory controller  (rev 01)
-  83:00.0 - 83:00.0 Non-Volatile memory controller  (rev 01)
+  83:00.0 - 83:00.0 Non-Volatile memory controller [0108]: Kingston Technology Company, Inc. DC2000B NVMe SSD [E18DC] [2646:5024] (rev 01)
+  84:00.0 - 84:00.0 Non-Volatile memory controller [0108]: Kingston Technology Company, Inc. DC2000B NVMe SSD [E18DC] [2646:5024] (rev 01)
 
 ⚠️  Skipping boot device at 83:00.0 - 83:00.0 Non-Volatile memory controller  (rev 01)
 ⚠️  Skipping boot device at 84:00.0 - 84:00.0 Non-Volatile memory controller  (rev 01)
@@ -37,7 +39,7 @@ sudo bash ./gen-vfio-ids.sh
 PCI ID     Vendor:Device  Device Description                                          
 --------------------------------------------------------------------------------------------
 05:00.0    1cc1:8201      ADATA Technology Co., Ltd. XPG SX8200 Pro PCIe Gen3x4 M.2 22
-06:00.0    2646:5024      Kingston Technology Company, Inc. DC2000B NVMe SSD    
+06:00.0    2646:5024      Kingston Technology Company, Inc. DC2000B NVMe SSD  
 ...
 
 🧹 Paste the following block into your initramfs vfio-pci-bind hook:
@@ -57,7 +59,7 @@ Copy that `BIND_PCI_IDS="..."` block for use in the next step.
 Create the initramfs hook:
 
 ```bash
-sudo nano /etc/initramfs-tools/scripts/init-top/vfio-pci-bind
+nano /etc/initramfs-tools/scripts/init-top/vfio-pci-bind
 ```
 
 Paste the following **and insert your copied `BIND_PCI_IDS` block**:
@@ -89,7 +91,7 @@ modprobe -i vfio-pci
 Make it executable:
 
 ```bash
-sudo chmod +x /etc/initramfs-tools/scripts/init-top/vfio-pci-bind
+chmod +x /etc/initramfs-tools/scripts/init-top/vfio-pci-bind
 ```
 
 ---
@@ -99,7 +101,7 @@ sudo chmod +x /etc/initramfs-tools/scripts/init-top/vfio-pci-bind
 Edit:
 
 ```bash
-sudo nano /etc/initramfs-tools/modules
+nano /etc/initramfs-tools/modules
 ```
 
 Add the following lines if not already present:
@@ -151,9 +153,9 @@ To change which devices are passed through:
 
 ## 🧹 Safety Notes
 
-* Boot devices are **automatically excluded** based on ZFS `boot-pool` membership
+* Boot devices are **automatically excluded** based on ZFS `boot-pool` or `rpool` membership, no other file systems are automatically detected
 * Only NVMe and SATA PCI devices are matched by default
-* This setup avoids any interference from systemd or kernel drivers by binding in **initramfs stage**
+* This setup avoids any interference from systemd or kernel drivers by binding in **initramfs stage** and ensure proxmox ZFS doesn't enumerate pools, which is does on every pool that has been passed through as PCI withou blacklisting the device ID
 
 ---
 
