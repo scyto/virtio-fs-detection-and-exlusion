@@ -26,8 +26,9 @@ if command -v zpool &>/dev/null; then
     pci_addr=$(basename "$(dirname "$(dirname "$pci_path")")")
     pci_addr=${pci_addr#0000:}
     BOOT_PCI_IDS+=("$pci_addr")
+    # exclude boot devices based on them being part of zfs pool called rpool or boot-pool, if you have a different file system it won't detect the boot drive 
   done < <(zpool status 2>/dev/null | awk '
-    /^  pool: (boot-pool|rpool)$/ {inpool=1; next} # excludes boot devices based on them being part of zfs pool, if you have a different file system it won't detect the boot drive 
+    /^  pool: (boot-pool|rpool)$/ {inpool=1; next} 
     inpool && $0 ~ /nvme/ {print $1}
     inpool && /^errors:/ {inpool=0}
   ')
